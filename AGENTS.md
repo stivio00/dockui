@@ -21,6 +21,9 @@ Smoke-test the TUI without a terminal of your own:
 script -q /tmp/dockui.log sh -c 'stty rows 40 cols 120; exec cargo run -- --exit-after 5000'
 ```
 
+On Windows (pwsh) just run `cargo run -- --exit-after 5000` — the TUI
+renders ANSI even without a pty.
+
 ## Non-negotiables
 
 - `cargo clippy --all-targets` reports zero warnings; `cargo test` is green
@@ -48,7 +51,8 @@ script -q /tmp/dockui.log sh -c 'stty rows 40 cols 120; exec cargo run -- --exit
 - `src/mock.rs` — demo fleet; containers whose id starts with `b` get
   privileged/GPU/host-namespace demo details
 - `tests/render.rs` — full-UI tests on a 130x42 TestBackend against mock
-  data; `tests/ops.rs` — ops parsing/mapping unit tests
+  data; `tests/ops.rs` — ops parsing/mapping unit tests;
+  `tests/exec.rs` — attached-session pump/key-encoding tests
 
 ## Adding a feature
 

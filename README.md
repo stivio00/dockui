@@ -48,8 +48,9 @@ cargo install --git https://github.com/stivio00/dockui
 cargo install --path .
 ```
 
-`dockui` talks to the daemon via `DOCKER_HOST` or the docker context store,
-just like the docker CLI.
+`dockui` talks to the daemon via `DOCKER_HOST` or the docker context
+store, just like the docker CLI: unix sockets, ssh tunnels, and Windows
+named pipes (Docker Desktop) are all supported.
 
 ## Keys
 
@@ -64,7 +65,7 @@ just like the docker CLI.
 | `t`                     | Interactive shell on running container            |
 | `E`                     | Edit & recreate container                         |
 | `S` `K` `R` `D`         | Start / stop / restart / remove container         |
-| `o`                     | Ops launcher (from `~/.dockui/ops.yml`)              |
+| `o`                     | Ops launcher (from `~/.dockui/ops.yml`)           |
 | `/`                     | Regex filter (Enter applies, Esc cancels)         |
 | `c`                     | Switch docker context                             |
 | `r`                     | Refresh                                           |

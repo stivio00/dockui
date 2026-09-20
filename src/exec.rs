@@ -100,7 +100,7 @@ async fn run_exec(
     else {
         anyhow::bail!("exec detached immediately");
     };
-    attached_session(output, stream_in, input).await
+    attached_session(output, Box::pin(tokio::io::stdout()), stream_in, input).await
 }
 
 /// `docker run -it` flow: create, attach (hijacked connection), start, pump.
@@ -155,23 +155,38 @@ async fn run_attach(
             .await;
         return Err(e.into());
     }
-    attached_session(attached.output, attached.input, input).await
+    attached_session(
+        attached.output,
+        Box::pin(tokio::io::stdout()),
+        attached.input,
+        input,
+    )
+    .await
 }
 
-/// Pump a hijacked docker stream to/from the real terminal until either the
-/// remote side ends or the input channel closes.
-async fn attached_session(
+/// Pump a hijacked docker stream until either the remote side ends or the
+/// input channel closes. Output frames (stdout/stderr multiplexed or raw
+/// pty bytes) are written straight to `out`; key events arriving on
+/// `input` are re-encoded and forwarded to `stream_in`.
+///
+/// bollard decodes hijacked TTY exec/attach streams as `LogOutput::Console`
+/// frames, not `StdOut`/`StdErr` — those must be written too or the session
+/// shows no output at all.
+pub async fn attached_session(
     output: LogStream,
+    out: ByteWriter,
     stream_in: ByteWriter,
     input: &mut UnboundedReceiver<CEvent>,
 ) -> anyhow::Result<()> {
     let mut stream_in = stream_in;
     let mut pump = tokio::spawn(async move {
         let mut output = output;
-        let mut out = tokio::io::stdout();
+        let mut out = out;
         while let Some(item) = output.next().await {
             match item {
-                Ok(LogOutput::StdOut { message }) | Ok(LogOutput::StdErr { message }) => {
+                Ok(LogOutput::StdOut { message })
+                | Ok(LogOutput::StdErr { message })
+                | Ok(LogOutput::Console { message }) => {
                     let _ = out.write_all(&message).await;
                     let _ = out.flush().await;
                 }

@@ -74,6 +74,15 @@ bytes, Alt+letter → ESC-prefixed). Ctrl-C therefore reaches the shell as
 `0x03` instead of quitting dockui. Keeping crossterm as the sole stdin
 reader is the invariant that makes this robust.
 
+bollard wraps hijacked exec/attach connections in
+`NewlineLogOutputDecoder::new(true)`, so TTY streams (raw pty bytes, no
+multiplexing header) decode to `LogOutput::Console` frames — never
+`StdOut`/`StdErr`. The pump must write `Console` frames too; dropping
+them makes every interactive session look dead (blank screen) on any
+transport, named pipe or unix socket alike. Non-TTY execs send
+multiplexed 8-byte-header frames instead, which decode to
+`StdOut`/`StdErr`.
+
 ## Mock mode
 
 `App::mock` fabricates a fleet (compose project `webshop`, standalone

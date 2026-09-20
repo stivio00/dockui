@@ -171,7 +171,11 @@ async fn attached_session(
         let mut out = tokio::io::stdout();
         while let Some(item) = output.next().await {
             match item {
-                Ok(LogOutput::StdOut { message }) | Ok(LogOutput::StdErr { message }) => {
+                // a tty session delivers everything as Console; a
+                // non-tty stream splits into StdOut/StdErr frames
+                Ok(LogOutput::StdOut { message })
+                | Ok(LogOutput::StdErr { message })
+                | Ok(LogOutput::Console { message }) => {
                     let _ = out.write_all(&message).await;
                     let _ = out.flush().await;
                 }

@@ -99,7 +99,10 @@ async fn exec_session(
 
     enable_raw_mode()?;
     execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
-    terminal.clear()?;
+    // Terminal::clear() queries the cursor position over stdin, which races
+    // with the app's input thread (and hangs without a terminal emulator on
+    // the other end); a fresh Terminal forces the same full repaint safely.
+    *terminal = ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
     res
 }
 

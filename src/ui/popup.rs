@@ -33,6 +33,7 @@ pub fn centered_rows(area: Rect, pct_x: u16, rows: u16) -> Rect {
 fn kind_label(kind: &EndpointKind) -> &'static str {
     match kind {
         EndpointKind::Unix => "unix",
+        EndpointKind::Pipe => "npipe",
         EndpointKind::Tcp => "tcp",
         EndpointKind::Ssh => "ssh",
         EndpointKind::Unknown => "?",

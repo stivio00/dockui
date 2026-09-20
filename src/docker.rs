@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::Stdio;
 
 use anyhow::{Context, anyhow, bail};
@@ -11,6 +12,7 @@ use crate::model::Container;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EndpointKind {
     Unix,
+    Pipe,
     Tcp,
     Ssh,
     Unknown,
@@ -28,6 +30,8 @@ impl DockerContext {
     pub fn kind_of(endpoint: &str) -> EndpointKind {
         if endpoint.starts_with("unix://") || endpoint.starts_with('/') {
             EndpointKind::Unix
+        } else if endpoint.starts_with("npipe://") {
+            EndpointKind::Pipe
         } else if endpoint.starts_with("tcp://") || endpoint.starts_with("http://") {
             EndpointKind::Tcp
         } else if endpoint.starts_with("ssh://") {
@@ -49,7 +53,16 @@ impl DockerContext {
     }
 }
 
+fn default_endpoint() -> &'static str {
+    if cfg!(windows) {
+        "npipe:////./pipe/docker_engine"
+    } else {
+        "unix:///var/run/docker.sock"
+    }
+}
+
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "PascalCase")]
 struct ContextMeta {
     #[serde(default)]
     name: Option<String>,
@@ -58,12 +71,14 @@ struct ContextMeta {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "PascalCase")]
 struct ContextEndpoint {
     #[serde(default)]
     host: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct DockerConfig {
     #[serde(default)]
     current_context: Option<String>,
@@ -71,7 +86,9 @@ struct DockerConfig {
 
 /// Discover docker contexts from `~/.docker`, honouring `DOCKER_HOST`.
 pub fn list_contexts() -> anyhow::Result<Vec<DockerContext>> {
-    let home = std::env::var("HOME").context("HOME not set")?;
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .context("neither HOME nor USERPROFILE is set")?;
     let docker_dir = Path::new(&home).join(".docker");
     let current_from_cfg = read_current_context(&docker_dir);
     let env_host = std::env::var("DOCKER_HOST").ok().filter(|h| !h.is_empty());
@@ -91,17 +108,13 @@ pub fn list_contexts() -> anyhow::Result<Vec<DockerContext>> {
             let host = meta
                 .endpoints
                 .and_then(|e| e.get("docker").and_then(|d| d.host.clone()))
-                .unwrap_or_else(|| "unix:///var/run/docker.sock".to_string());
+                .unwrap_or_else(|| default_endpoint().to_string());
             found.push(DockerContext::new(name, host, false));
         }
     }
     found.sort_by(|a, b| a.name.cmp(&b.name));
     if found.is_empty() {
-        found.push(DockerContext::new(
-            "default",
-            "unix:///var/run/docker.sock",
-            false,
-        ));
+        found.push(DockerContext::new("default", default_endpoint(), false));
     }
 
     let effective = env_host
@@ -110,12 +123,14 @@ pub fn list_contexts() -> anyhow::Result<Vec<DockerContext>> {
     for ctx in &mut found {
         ctx.current = match (&effective, &env_host) {
             (Some(cur), _) => &ctx.name == cur,
-            (None, Some(host)) => ctx.kind == EndpointKind::Unix && ctx.endpoint == *host,
+            (None, Some(host)) => {
+                matches!(ctx.kind, EndpointKind::Unix | EndpointKind::Pipe) && ctx.endpoint == *host
+            }
             _ => false,
         };
     }
     if let Some(host) = env_host {
-        let name = if host == "unix:///var/run/docker.sock" {
+        let name = if host == default_endpoint() {
             "default".to_string()
         } else {
             "DOCKER_HOST".to_string()
@@ -168,6 +183,7 @@ pub struct Connection {
     pub tunnel: Option<Tunnel>,
 }
 
+#[cfg(unix)]
 fn parse_ssh_endpoint(endpoint: &str) -> anyhow::Result<(String, Option<String>, String)> {
     // ssh://[user@]host[:port][/remote/socket]
     let rest = endpoint
@@ -197,6 +213,7 @@ fn parse_ssh_endpoint(endpoint: &str) -> anyhow::Result<(String, Option<String>,
     Ok((target, port, remote_sock))
 }
 
+#[cfg(unix)]
 async fn connect_ssh(endpoint: &str, ctx_name: &str) -> anyhow::Result<Tunnel> {
     let (target, port, remote_sock) = parse_ssh_endpoint(endpoint)?;
     let safe: String = ctx_name
@@ -243,35 +260,13 @@ async fn connect_ssh(endpoint: &str, ctx_name: &str) -> anyhow::Result<Tunnel> {
 
 pub async fn connect(ctx: &DockerContext) -> anyhow::Result<Connection> {
     let docker = match ctx.kind {
-        EndpointKind::Unix => {
-            let path = ctx
-                .endpoint
-                .strip_prefix("unix://")
-                .map(|p| p.to_string())
-                .unwrap_or_else(|| ctx.endpoint.clone());
-            if !Path::new(&path).exists() {
-                bail!("docker socket not found: {path}");
-            }
-            Docker::connect_with_unix(&path, CONNECT_TIMEOUT, bollard::API_DEFAULT_VERSION)
-                .map_err(|e| anyhow!("unix connect failed: {e}"))?
-        }
+        EndpointKind::Unix => connect_local_socket(&ctx.endpoint)?,
+        EndpointKind::Pipe => connect_named_pipe(&ctx.endpoint)?,
         EndpointKind::Tcp => {
             Docker::connect_with_http(&ctx.endpoint, CONNECT_TIMEOUT, bollard::API_DEFAULT_VERSION)
                 .map_err(|e| anyhow!("tcp connect failed: {e}"))?
         }
-        EndpointKind::Ssh => {
-            let tunnel = connect_ssh(&ctx.endpoint, &ctx.name).await?;
-            let sock = tunnel.socket_path().display().to_string();
-            let docker =
-                Docker::connect_with_unix(&sock, CONNECT_TIMEOUT, bollard::API_DEFAULT_VERSION)
-                    .map_err(|e| anyhow!("tunnel connect failed: {e}"))?;
-            let conn = Connection {
-                docker,
-                tunnel: Some(tunnel),
-            };
-            ping(&conn.docker).await?;
-            return Ok(conn);
-        }
+        EndpointKind::Ssh => return connect_via_ssh(ctx).await,
         EndpointKind::Unknown => bail!("unsupported endpoint: {}", ctx.endpoint),
     };
     ping(&docker).await?;
@@ -279,6 +274,54 @@ pub async fn connect(ctx: &DockerContext) -> anyhow::Result<Connection> {
         docker,
         tunnel: None,
     })
+}
+
+#[cfg(unix)]
+fn connect_local_socket(endpoint: &str) -> anyhow::Result<Docker> {
+    let path = endpoint
+        .strip_prefix("unix://")
+        .map(|p| p.to_string())
+        .unwrap_or_else(|| endpoint.to_string());
+    if !Path::new(&path).exists() {
+        bail!("docker socket not found: {path}");
+    }
+    Docker::connect_with_unix(&path, CONNECT_TIMEOUT, bollard::API_DEFAULT_VERSION)
+        .map_err(|e| anyhow!("unix connect failed: {e}"))
+}
+
+#[cfg(not(unix))]
+fn connect_local_socket(endpoint: &str) -> anyhow::Result<Docker> {
+    bail!("unix socket endpoints are not supported on this platform: {endpoint}")
+}
+
+#[cfg(windows)]
+fn connect_named_pipe(endpoint: &str) -> anyhow::Result<Docker> {
+    Docker::connect_with_named_pipe(endpoint, CONNECT_TIMEOUT, bollard::API_DEFAULT_VERSION)
+        .map_err(|e| anyhow!("named pipe connect failed: {e}"))
+}
+
+#[cfg(not(windows))]
+fn connect_named_pipe(endpoint: &str) -> anyhow::Result<Docker> {
+    bail!("named pipe endpoints are only supported on Windows: {endpoint}")
+}
+
+#[cfg(unix)]
+async fn connect_via_ssh(ctx: &DockerContext) -> anyhow::Result<Connection> {
+    let tunnel = connect_ssh(&ctx.endpoint, &ctx.name).await?;
+    let sock = tunnel.socket_path().display().to_string();
+    let docker = Docker::connect_with_unix(&sock, CONNECT_TIMEOUT, bollard::API_DEFAULT_VERSION)
+        .map_err(|e| anyhow!("tunnel connect failed: {e}"))?;
+    let conn = Connection {
+        docker,
+        tunnel: Some(tunnel),
+    };
+    ping(&conn.docker).await?;
+    Ok(conn)
+}
+
+#[cfg(not(unix))]
+async fn connect_via_ssh(_ctx: &DockerContext) -> anyhow::Result<Connection> {
+    bail!("ssh endpoints require a unix socket tunnel, not supported on this platform")
 }
 
 pub async fn ping(docker: &Docker) -> anyhow::Result<()> {

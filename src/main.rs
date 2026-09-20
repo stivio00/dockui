@@ -4,10 +4,10 @@ use ratatui::crossterm::event::{DisableMouseCapture, EnableMouseCapture, Event a
 use ratatui::crossterm::execute;
 use tokio::sync::mpsc;
 
-use dui::app::App;
-use dui::exec::{TerminalRequest, run_session};
-use dui::ui;
-use dui::workers::Msg;
+use dockui::app::App;
+use dockui::exec::{TerminalRequest, run_session};
+use dockui::ui;
+use dockui::workers::Msg;
 
 fn parse_args() -> (bool, Option<u64>) {
     let args: Vec<String> = std::env::args().collect();
@@ -62,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
     ratatui::restore();
 
     if let Err(e) = result {
-        eprintln!("dui: {e:#}");
+        eprintln!("dockui: {e:#}");
         std::process::exit(1);
     }
     // force exit so the crossterm reader thread cannot block shutdown

@@ -1,6 +1,6 @@
-# AGENTS.md — working on dui
+# AGENTS.md — working on dockui
 
-`dui` is a ratatui + bollard Docker TUI. Read `docs/architecture.md` first;
+`dockui` is a ratatui + bollard Docker TUI. Read `docs/architecture.md` first;
 this file is the quick operating manual for agents and contributors.
 
 ## Commands
@@ -18,7 +18,7 @@ cargo fmt                          # always run before committing
 Smoke-test the TUI without a terminal of your own:
 
 ```sh
-script -q /tmp/dui.log sh -c 'stty rows 40 cols 120; exec cargo run -- --exit-after 5000'
+script -q /tmp/dockui.log sh -c 'stty rows 40 cols 120; exec cargo run -- --exit-after 5000'
 ```
 
 ## Non-negotiables
@@ -33,7 +33,7 @@ script -q /tmp/dui.log sh -c 'stty rows 40 cols 120; exec cargo run -- --exit-af
   API calls — many option structs are generic over `T: Into<String>` and
   several types exist under both `bollard::models` and other modules.
 - ratatui 0.30: `ratatui::init()` enables raw mode + alt screen but NOT
-  mouse capture — dui enables/disables it manually in `src/main.rs`.
+  mouse capture — dockui enables/disables it manually in `src/main.rs`.
 - State that must survive redraws lives on `App` (src/app.rs), never in
   widgets. `App.areas` is written during draw and read by mouse handlers.
 

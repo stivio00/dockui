@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
-use dui::ops::{Cmd, GpuSpec, Op, expand_template, expand_with, parse_ops, parse_port, parse_size};
-use dui::util::{split_command, split_list};
+use dockui::ops::{
+    Cmd, GpuSpec, Op, expand_template, expand_with, parse_ops, parse_port, parse_size,
+};
+use dockui::util::{split_command, split_list};
 
 fn op_from_yaml(yaml: &str) -> Op {
     let ops = parse_ops(yaml).expect("parse");
@@ -54,23 +56,23 @@ fn parse_ops_rejects_invalid_yaml() {
 #[test]
 fn expand_template_env_vars() {
     let vars: HashMap<String, String> = [
-        ("DUI_TEST_VAR", "hello"),
-        ("DUI_X", "a b"), // value with a space
+        ("DOCKUI_TEST_VAR", "hello"),
+        ("DOCKUI_X", "a b"), // value with a space
     ]
     .into_iter()
     .map(|(k, v)| (k.to_string(), v.to_string()))
     .collect();
     let lookup = |k: &str| vars.get(k).cloned();
-    assert_eq!(expand_with("x${DUI_TEST_VAR}y", lookup), "xhelloy");
-    assert_eq!(expand_with("$DUI_TEST_VAR!", lookup), "hello!");
+    assert_eq!(expand_with("x${DOCKUI_TEST_VAR}y", lookup), "xhelloy");
+    assert_eq!(expand_with("$DOCKUI_TEST_VAR!", lookup), "hello!");
     assert_eq!(
-        expand_with("${DUI_TEST_VAR}-${DUI_TEST_VAR}", lookup),
+        expand_with("${DOCKUI_TEST_VAR}-${DOCKUI_TEST_VAR}", lookup),
         "hello-hello"
     );
-    assert_eq!(expand_with("$DUI_X", lookup), "a b");
+    assert_eq!(expand_with("$DOCKUI_X", lookup), "a b");
     // unknown vars expand to empty, lone dollars stay, unclosed braces are
     // kept verbatim
-    assert_eq!(expand_with("${DUI_MISSING_VAR_XYZ}", lookup), "");
+    assert_eq!(expand_with("${DOCKUI_MISSING_VAR_XYZ}", lookup), "");
     assert_eq!(expand_with("no vars", lookup), "no vars");
     assert_eq!(expand_with("dollar $ alone", lookup), "dollar $ alone");
     assert_eq!(expand_with("unclosed ${oops", lookup), "unclosed ${oops");
@@ -303,7 +305,7 @@ test:
 #[test]
 fn load_reports_missing_home_as_error_but_missing_file_as_ok() {
     // missing file is fine (user has no ops yet); only report real errors
-    let (_, err) = dui::ops::load();
+    let (_, err) = dockui::ops::load();
     if let Some(e) = err {
         // $HOME always set in test envs; a file that exists must parse
         assert!(!e.is_empty());

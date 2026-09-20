@@ -1,6 +1,6 @@
-# dui — Docker, in your terminal
+# dockui — Docker, in your terminal
 
-`dui` is a fast, mouse-aware terminal UI for Docker: browse containers,
+`dockui` is a fast, mouse-aware terminal UI for Docker: browse containers,
 projects, services and volumes; watch live CPU/memory sparklines; tail logs
 and events; start/stop/restart/remove containers; edit-and-recreate them
 with changed ports, env, GPUs or privileges; open an interactive shell on
@@ -30,7 +30,7 @@ cargo run --release
   privileged, GPUs, network), `t` interactive shell (`docker exec -it`,
   bash-or-sh, as configured user / root / custom).
 - **Ops** (`o`): user-defined one-key container launches from
-  `~/.dui/ops.yml` — privileged/GPU/host-namespace configs, port and
+  `~/.dockui/ops.yml` — privileged/GPU/host-namespace configs, port and
   volume mappings, `attach: true` for `docker run -it` style ops.
 - **Search/filter** (`/`) with regex, applied to the tree, stats, logs and
   events. `Esc` clears.
@@ -43,12 +43,12 @@ cargo run --release
 From source (Rust 1.85+):
 
 ```sh
-cargo install --git https://github.com/stivio00/dui
+cargo install --git https://github.com/stivio00/dockui
 # or from a checkout:
 cargo install --path .
 ```
 
-`dui` talks to the daemon via `DOCKER_HOST` or the docker context store,
+`dockui` talks to the daemon via `DOCKER_HOST` or the docker context store,
 just like the docker CLI.
 
 ## Keys
@@ -64,14 +64,14 @@ just like the docker CLI.
 | `t`                     | Interactive shell on running container            |
 | `E`                     | Edit & recreate container                         |
 | `S` `K` `R` `D`         | Start / stop / restart / remove container         |
-| `o`                     | Ops launcher (from `~/.dui/ops.yml`)              |
+| `o`                     | Ops launcher (from `~/.dockui/ops.yml`)              |
 | `/`                     | Regex filter (Enter applies, Esc cancels)         |
 | `c`                     | Switch docker context                             |
 | `r`                     | Refresh                                           |
 | `q` / Ctrl-C            | Quit                                              |
 | `?`                     | Help                                              |
 
-## Ops — `~/.dui/ops.yml`
+## Ops — `~/.dockui/ops.yml`
 
 Define one-key launches; see [`ops.example.yml`](ops.example.yml) for all
 fields. Highlights:

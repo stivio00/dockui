@@ -190,7 +190,7 @@ fn draw_ops(f: &mut Frame, app: &mut App, area: Rect) {
                 "no ops in {} — see ops.example.yml",
                 crate::ops::ops_path()
                     .map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "~/.dui/ops.yml".into())
+                    .unwrap_or_else(|| "~/.dockui/ops.yml".into())
             ),
         };
         f.render_widget(
@@ -234,7 +234,7 @@ fn draw_ops(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(
         List::new(items)
             .block(popup_block(
-                " OPS (~/.dui/ops.yml) │ ↑/↓ select │ enter run │ esc cancel",
+                " OPS (~/.dockui/ops.yml) │ ↑/↓ select │ enter run │ esc cancel",
             ))
             .highlight_style(list_highlight())
             .highlight_symbol("▶ "),
@@ -471,7 +471,7 @@ fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             key("S/K/R/D"),
             desc("start / stop / restart / delete container"),
         ]),
-        Line::from(vec![key("o"), desc("run ops from ~/.dui/ops.yml")]),
+        Line::from(vec![key("o"), desc("run ops from ~/.dockui/ops.yml")]),
         Line::from(vec![key("f"), desc("toggle follow (logs / events)")]),
         Line::from(vec![key("s"), desc("switch log container (in logs view)")]),
         Line::from(vec![key("c"), desc("docker context selector")]),

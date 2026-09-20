@@ -203,7 +203,7 @@ async fn connect_ssh(endpoint: &str, ctx_name: &str) -> anyhow::Result<Tunnel> {
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect();
-    let socket_path = std::env::temp_dir().join(format!("dui-docker-{safe}.sock"));
+    let socket_path = std::env::temp_dir().join(format!("dockui-docker-{safe}.sock"));
     let _ = std::fs::remove_file(&socket_path);
 
     let mut cmd = tokio::process::Command::new("ssh");

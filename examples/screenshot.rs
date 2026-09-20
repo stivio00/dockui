@@ -2,9 +2,9 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 
-use dui::app::{App, Popup, RowKind, View};
-use dui::mock;
-use dui::workers::Msg;
+use dockui::app::{App, Popup, RowKind, View};
+use dockui::mock;
+use dockui::workers::Msg;
 
 fn setup_app() -> App {
     let (tx, _rx) = tokio::sync::mpsc::channel(1024);
@@ -34,7 +34,7 @@ fn setup_app() -> App {
             };
             app.handle_msg(Msg::Stats {
                 id: c.id.clone(),
-                sample: dui::model::StatsSample {
+                sample: dockui::model::StatsSample {
                     cpu_pct: (base + phase.sin() * 14.0).max(0.2),
                     mem: 412_000_000,
                     mem_limit: 4_294_967_296,
@@ -48,7 +48,7 @@ fn setup_app() -> App {
             });
         }
     }
-    app.handle_msg(Msg::Event(dui::model::DockerEvent {
+    app.handle_msg(Msg::Event(dockui::model::DockerEvent {
         time: 1761300012,
         typ: "container".into(),
         action: "start".into(),
@@ -56,7 +56,7 @@ fn setup_app() -> App {
         actor_name: "webshop-web-1".into(),
         scope: "local".into(),
     }));
-    app.handle_msg(Msg::Event(dui::model::DockerEvent {
+    app.handle_msg(Msg::Event(dockui::model::DockerEvent {
         time: 1761300025,
         typ: "image".into(),
         action: "pull".into(),
@@ -67,7 +67,7 @@ fn setup_app() -> App {
     app
 }
 
-fn feed_logs(app: &mut App, containers: &[dui::model::Container]) {
+fn feed_logs(app: &mut App, containers: &[dockui::model::Container]) {
     for i in 0..24 {
         for c in containers {
             if c.is_running() {
@@ -88,7 +88,7 @@ fn feed_logs(app: &mut App, containers: &[dui::model::Container]) {
 fn dump(app: &mut App, title: &str) -> anyhow::Result<()> {
     let backend = TestBackend::new(118, 34);
     let mut terminal = Terminal::new(backend)?;
-    let frame = terminal.draw(|f| dui::ui::draw(f, app))?;
+    let frame = terminal.draw(|f| dockui::ui::draw(f, app))?;
     println!("=== {title} ===");
     print_buffer(frame.buffer);
     Ok(())

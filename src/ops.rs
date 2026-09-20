@@ -213,7 +213,7 @@ pub fn expand_with<F: Fn(&str) -> Option<String>>(s: &str, lookup: F) -> String 
 pub fn ops_path() -> Option<PathBuf> {
     std::env::var("HOME")
         .ok()
-        .map(|h| PathBuf::from(h).join(".dui").join("ops.yml"))
+        .map(|h| PathBuf::from(h).join(".dockui").join("ops.yml"))
 }
 
 pub fn load() -> (Vec<(String, Op)>, Option<String>) {

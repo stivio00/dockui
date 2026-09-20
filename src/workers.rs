@@ -742,7 +742,7 @@ async fn recreate(
     )))
 }
 
-/// Run a user op from ~/.dui/ops.yml: replace if requested, create (pulling
+/// Run a user op from ~/.dockui/ops.yml: replace if requested, create (pulling
 /// the image on 404), then start.
 pub fn spawn_run_op(docker: Docker, tx: Sender<Msg>, op_name: String, op: Op) -> JoinHandle<()> {
     tokio::spawn(async move {

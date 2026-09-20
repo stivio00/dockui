@@ -1,13 +1,13 @@
 [package]
-name = "dui"
+name = "dockui"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 description = "A fast, mouse-aware Docker TUI: containers, stats, logs, events, one-key ops and interactive shells"
 authors = ["Stephen Krol <krol17@gmail.com>"]
 license = "Apache-2.0"
-repository = "https://github.com/stivio00/dui"
-homepage = "https://github.com/stivio00/dui"
+repository = "https://github.com/stivio00/dockui"
+homepage = "https://github.com/stivio00/dockui"
 readme = "README.md"
 keywords = ["docker", "tui", "ratatui", "terminal", "dashboard"]
 categories = ["command-line-utilities", "development-tools"]

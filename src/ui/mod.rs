@@ -35,7 +35,7 @@ fn header_line(app: &App) -> Line<'static> {
     let sep = Span::styled(" │ ", Style::new().fg(Color::DarkGray));
     Line::from(vec![
         Span::styled(
-            " dui ",
+            " dockui ",
             Style::new()
                 .bg(Color::Cyan)
                 .fg(Color::Black)

@@ -1,5 +1,5 @@
-# dui ops — one-click container operations, selected with [o] in the TUI.
-# Copy to ~/.dui/ops.yml and edit to taste.
+# dockui ops — one-click container operations, selected with [o] in the TUI.
+# Copy to ~/.dockui/ops.yml and edit to taste.
 #
 # Fields:
 #   image       (required) image to run

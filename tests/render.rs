@@ -3,9 +3,9 @@ use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use dui::app::{App, Popup, RowKind, View};
-use dui::mock;
-use dui::workers::{LogTarget, Msg};
+use dockui::app::{App, Popup, RowKind, View};
+use dockui::mock;
+use dockui::workers::{LogTarget, Msg};
 
 fn test_app() -> App {
     let (tx, _rx) = tokio::sync::mpsc::channel(1024);
@@ -19,7 +19,7 @@ fn test_app() -> App {
             details: mock::sample_details(&c.id),
         });
     }
-    app.handle_msg(Msg::Event(dui::model::DockerEvent {
+    app.handle_msg(Msg::Event(dockui::model::DockerEvent {
         time: 1761300012,
         typ: "container".into(),
         action: "start".into(),
@@ -33,7 +33,7 @@ fn test_app() -> App {
 fn render(app: &mut App, w: u16, h: u16) -> Vec<String> {
     let backend = TestBackend::new(w, h);
     let mut terminal = Terminal::new(backend).unwrap();
-    let frame = terminal.draw(|f| dui::ui::draw(f, app)).unwrap();
+    let frame = terminal.draw(|f| dockui::ui::draw(f, app)).unwrap();
     buffer_lines(frame.buffer)
 }
 
@@ -166,7 +166,7 @@ fn stats_view_renders_table_and_sparklines() {
         for id in &ids {
             app.handle_msg(Msg::Stats {
                 id: id.clone(),
-                sample: dui::model::StatsSample {
+                sample: dockui::model::StatsSample {
                     cpu_pct: 12.5,
                     mem: 100_000_000,
                     mem_limit: 4_294_967_296,

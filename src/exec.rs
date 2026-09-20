@@ -182,7 +182,7 @@ async fn attached_session(
                     let msg = e.to_string();
                     if !msg.contains("No such container") && !msg.contains("No such exec instance")
                     {
-                        eprintln!("\r\ndui: session ended: {msg}");
+                        eprintln!("\r\ndockui: session ended: {msg}");
                     }
                     break;
                 }

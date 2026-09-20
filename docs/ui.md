@@ -51,7 +51,7 @@ are recorded in `App.areas` for mouse support. Clicking outside closes.
 
 - **Contexts** (`c`) — docker context switcher.
 - **Help** (`?`) — key reference.
-- **Ops** (`o`) — entries from `~/.dui/ops.yml` with description + a
+- **Ops** (`o`) — entries from `~/.dockui/ops.yml` with description + a
   flag summary (image, --privileged, --gpus, --net …, -it).
 - **Confirm** — shown for remove; `y`/Enter proceeds, `n`/Esc cancels.
 - **Edit** (`E`) — 8 fields (Name, Image, Command, Env `;`-separated,

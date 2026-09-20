@@ -28,7 +28,7 @@ Notes that are easy to get wrong; verified against the crate sources in
 - Errors: connection/HTTP failures arrive as
   `DockerResponseServerError { status_code: u16, message }`; 404 checks
   use that (see `workers::is_not_found`).
-- Image pulls stream `CreateImageInfo` with `.error` on failure; dui
+- Image pulls stream `CreateImageInfo` with `.error` on failure; dockui
   pulls on `pull: always` or on a 404 at create time.
 
 ## ratatui 0.30 / crossterm 0.29
@@ -71,7 +71,7 @@ session loop `select!`s between that pump finishing (remote end) and key
 events arriving on the app's input channel, re-encoded via
 `encode_key` (chars, CR, DEL, arrows, F-keys, Ctrl+letter → control
 bytes, Alt+letter → ESC-prefixed). Ctrl-C therefore reaches the shell as
-`0x03` instead of quitting dui. Keeping crossterm as the sole stdin
+`0x03` instead of quitting dockui. Keeping crossterm as the sole stdin
 reader is the invariant that makes this robust.
 
 ## Mock mode

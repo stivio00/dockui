@@ -1,4 +1,4 @@
-# Contributing & extending dui
+# Contributing & extending dockui
 
 ## Ground rules
 

@@ -2,6 +2,7 @@ pub mod actions;
 pub mod app;
 pub mod docker;
 pub mod exec;
+pub mod files;
 pub mod mock;
 pub mod model;
 pub mod ops;

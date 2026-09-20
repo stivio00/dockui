@@ -1,5 +1,6 @@
 pub mod detail;
 pub mod events;
+pub mod files;
 pub mod logs;
 pub mod popup;
 pub mod stats;
@@ -75,6 +76,7 @@ fn footer_line(app: &App) -> Line<'static> {
             ("L", "logs"),
             ("t", "sh"),
             ("E", "edit"),
+            ("f", "files"),
             ("S/K/R/D", "ctl"),
             ("/", "filter"),
             ("o", "ops"),
@@ -104,6 +106,15 @@ fn footer_line(app: &App) -> Line<'static> {
             ("s", "switch"),
             ("/", "filter"),
             ("esc", "back"),
+            ("q", "quit"),
+        ],
+        View::Files => &[
+            ("j/k", "nav"),
+            ("enter", "open dir"),
+            ("←", "parent"),
+            ("/", "filter"),
+            ("esc", "back"),
+            ("r", "reload"),
             ("q", "quit"),
         ],
     };
@@ -220,6 +231,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         View::Stats => stats::draw(f, app, chunks[1]),
         View::Logs => logs::draw(f, app, chunks[1]),
         View::Events => events::draw(f, app, chunks[1]),
+        View::Files => files::draw(f, app, chunks[1]),
     }
 
     // footer / search prompt

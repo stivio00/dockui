@@ -558,6 +558,10 @@ fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
         ]),
         Line::from(vec![key("t"), desc("open terminal on running container")]),
         Line::from(vec![
+            key("f"),
+            desc("browse files (container fs / volume) · follow (logs)"),
+        ]),
+        Line::from(vec![
             key("E"),
             desc("edit + recreate container (env edits as table)"),
         ]),
@@ -570,7 +574,6 @@ fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             desc("start / stop / restart / delete container"),
         ]),
         Line::from(vec![key("o"), desc("run ops from ~/.dockui/ops.yml")]),
-        Line::from(vec![key("f"), desc("toggle follow (logs / events)")]),
         Line::from(vec![key("s"), desc("switch log container (in logs view)")]),
         Line::from(vec![key("c"), desc("docker context selector")]),
         Line::from(vec![key("r"), desc("refresh")]),

@@ -42,20 +42,27 @@ renders ANSI even without a pty.
   without a terminal emulator. To force a full repaint, recreate the
   `Terminal` and send `Clear(ClearType::All)` after `EnterAlternateScreen`
   (see `exec_session` in `src/main.rs`).
-- State that must survive redraws lives on `App` (src/app.rs), never in
+- State that must survive redraws lives on `App` (src/app/), never in
   widgets. `App.areas` is written during draw and read by mouse handlers.
   Popup-layer state that rides on another popup (e.g. `env_editor` over
   `Popup::Edit`) and layout state (`split_pct`, `dragging_split`) also
   live on `App`.
+- Files-view worker responses carry a monotonic `req` id (`App.files_req`);
+  never reset it per-open, or a stale in-flight listing can clobber the
+  new one after reopening the view.
 
 ## Structure
 
 - `src/main.rs` — event loop, input thread, interactive terminal handoff
-- `src/app.rs` — all state, key/mouse handling, actions, popups
+- `src/app/` — all state and behavior, split by concern:
+  `mod.rs` (types, `App`, `handle_msg`, tree rebuild, stream bookkeeping,
+  files explorer), `keys.rs` (key handlers + action/edit/exec/ops
+  launchers), `mouse.rs` (mouse dispatch)
 - `src/workers.rs` — background tasks and the `Msg` protocol
 - `src/ui/` — pure rendering from `App`; no logic
-- `src/ops.rs`, `src/actions.rs`, `src/exec.rs` — ops schema, edit form +
-  container actions, attached terminal sessions
+- `src/ops.rs`, `src/actions.rs`, `src/exec.rs`, `src/files.rs` — ops
+  schema, edit form + container actions, attached terminal sessions,
+  tar-listing parser (+ mock filesystem)
 - `src/mock.rs` — demo fleet; containers whose id starts with `b` get
   privileged/GPU/host-namespace demo details
 - `tests/render.rs` — full-UI tests on a 130x42 TestBackend against mock

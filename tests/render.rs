@@ -496,3 +496,96 @@ fn split_resize_keys_and_drag_move_divider() {
     let dragged_w = app.areas.tree.width;
     assert!(dragged_w < default_w, "drag did not shrink tree pane");
 }
+
+#[test]
+fn files_view_opens_navigates_and_returns() {
+    let mut app = test_app();
+    let idx = app
+        .tree_rows
+        .iter()
+        .position(|r| matches!(&r.kind, RowKind::Container(id) if id.starts_with("a1b2")))
+        .unwrap();
+    app.tree_sel = idx;
+    press(&mut app, 'f');
+    assert_eq!(app.view, View::Files);
+    let lines = render(&mut app, 130, 42);
+    let text = joined(&lines);
+    assert!(text.contains("FILES: webshop-web-1"));
+    assert!(text.contains("bin/"));
+    assert!(text.contains("etc/"));
+    assert!(text.contains(".dockerenv"));
+    assert!(text.contains("6 items"));
+
+    press(&mut app, 'j');
+    app.handle_key(key(KeyCode::Enter));
+    assert_eq!(app.files.as_ref().unwrap().path, "/etc");
+    let lines = render(&mut app, 130, 42);
+    let text = joined(&lines);
+    assert!(text.contains("hostname"));
+    assert!(text.contains("resolv.conf"));
+    assert!(text.contains("ssl/"));
+
+    app.handle_key(key(KeyCode::Backspace));
+    assert_eq!(app.files.as_ref().unwrap().path, "/");
+    press(&mut app, 'r');
+    assert_eq!(app.files.as_ref().unwrap().entries.len(), 6);
+
+    app.handle_key(key(KeyCode::Esc));
+    assert_eq!(app.view, View::Tree);
+}
+
+#[test]
+fn files_view_volume_browse() {
+    let mut app = test_app();
+    let idx = app
+        .tree_rows
+        .iter()
+        .position(|r| matches!(&r.kind, RowKind::Volume(v) if v == "registry_data"))
+        .unwrap();
+    app.tree_sel = idx;
+    press(&mut app, 'f');
+    assert_eq!(app.view, View::Files);
+    let lines = render(&mut app, 130, 42);
+    let text = joined(&lines);
+    assert!(text.contains("FILES: registry_data"));
+    assert!(text.contains("data/"));
+    assert!(text.contains("README.md"));
+
+    app.handle_key(key(KeyCode::Enter));
+    assert_eq!(app.files.as_ref().unwrap().path, "/data");
+    let lines = render(&mut app, 130, 42);
+    let text = joined(&lines);
+    assert!(text.contains("db.sqlite"));
+    assert!(text.contains("sessions/"));
+    app.handle_key(key(KeyCode::Esc));
+    assert_eq!(app.view, View::Tree);
+}
+
+#[test]
+fn files_view_mouse_selects_and_opens() {
+    let mut app = test_app();
+    let idx = app
+        .tree_rows
+        .iter()
+        .position(|r| matches!(&r.kind, RowKind::Container(id) if id.starts_with("a1b2")))
+        .unwrap();
+    app.tree_sel = idx;
+    press(&mut app, 'f');
+    let _ = render(&mut app, 130, 42);
+    let a = app.areas.files;
+    assert!(a.width > 0);
+
+    app.handle_mouse(mouse(
+        MouseEventKind::Down(MouseButton::Left),
+        a.x + 4,
+        a.y + 4,
+    ));
+    assert_eq!(app.files.as_ref().unwrap().sel, 2);
+
+    app.handle_mouse(mouse(
+        MouseEventKind::Down(MouseButton::Left),
+        a.x + 4,
+        a.y + 4,
+    ));
+    assert_eq!(app.files.as_ref().unwrap().path, "/home");
+}

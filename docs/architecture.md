@@ -7,8 +7,8 @@
 │  exec channel ───────────► exec_rx ───┘      │                  │
 └──────────────────────────────────────────────┼──────────────────┘
                                                ▼
-                                     App (src/app.rs)
-                            all state · keys · mouse · actions
+                                       App (src/app/)
+                             all state · keys · mouse · actions
                                                ▲
                                                │ renders from
                                     src/ui/* (pure draw fns)
@@ -28,15 +28,25 @@
   plus an optional `--exit-after` deadline. Note: `select!` evaluates
   every branch expression even when a branch's `if` precondition is
   false, so futures must be built before the macro.
-- **`app.rs`** holds every piece of mutable state (containers, stats,
+- **`app/`** holds every piece of mutable state (containers, stats,
   logs, events, tree rows, search, popups, toast, `areas`) and all
-  behavior. Widgets own no state; anything that must survive a redraw
-  lives here.
+  behavior, split by concern: `mod.rs` (types, `App` struct, `handle_msg`,
+  tree rebuild, view/stream bookkeeping, files-explorer state), `keys.rs`
+  (every `handle_*_key` plus the action/edit/exec/ops launchers) and
+  `mouse.rs` (mouse dispatch). Widgets own no state; anything that must
+  survive a redraw lives here.
+- **`files.rs`** parses docker archive (tar) listings into `FsEntry`
+  rows — both tar shapes docker produces — and provides the mock
+  filesystem for `--mock`.
 - **`workers.rs`** spawns tokio tasks (list/stats/logs/events/inspect,
-  container actions, recreate, ops) that talk to the daemon through a
-  cloned `Docker` client and report back via `Msg`. Worker sets are
-  tracked in `JoinSet` groups so views can abort exactly the streams
-  they own (`leave_view_streams`).
+  container actions, recreate, ops, filesystem listings) that talk to the
+  daemon through a cloned `Docker` client and report back via `Msg`.
+  Worker sets are tracked in `JoinSet` groups so views can abort exactly
+  the streams they own (`leave_view_streams`). Filesystem requests carry
+  a monotonic `req` counter so a stale `FilesListed` can never overwrite
+  a newer listing. Volume listings create a throwaway never-started
+  busybox container bind-mounting the volume at `/mnt/dockui`, read its
+  tar, and always remove the container.
 - **`ui/`** modules are pure functions of `App` + a `Rect`. As a side
   effect they record each region's rect into `App.areas`, which the
   mouse handlers read afterwards.

@@ -2,8 +2,27 @@ use crate::model::Container;
 
 pub fn sort_containers(list: Vec<&Container>) -> Vec<&Container> {
     let mut v = list;
-    v.sort_by(|a, b| a.name.cmp(&b.name));
+    v.sort_by_key(|c| (c.state != "running", c.name.clone()));
     v
+}
+
+/// 1234 -> "1.2K", 5 -> "5B", 0 -> "-", 730 -> "730B" (below 1024 stays in bytes).
+pub fn human_bytes(n: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "K", "M", "G", "T"];
+    if n == 0 {
+        return "-".into();
+    }
+    let mut v = n as f64;
+    let mut u = 0;
+    while v >= 1024.0 && u < UNITS.len() - 1 {
+        v /= 1024.0;
+        u += 1;
+    }
+    if u == 0 {
+        format!("{n}B")
+    } else {
+        format!("{v:.1}{}", UNITS[u])
+    }
 }
 
 /// Truncate a string to fit `width` display columns, appending an ellipsis if

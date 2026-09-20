@@ -3,9 +3,10 @@
 The screen is a header line, a body, a status line (toast / error) and a
 footer of key hints. The body depends on the active view:
 
-- **Tree view** (`1`): left = tree (75%), right = detail pane.
+- **Tree view** (`1`): left = tree (58% default, resizable), right = detail pane.
 - **Stats** (`2`), **Events** (`3`), **Logs** (`4`): single full-width
   panel; Logs/Events target names are shown in the panel title.
+- **Files** (`f` on a container or volume row): filesystem explorer.
 - **Detail focus**: inside Tree view, focus can move between the tree and
   the detail pane (Tab / Enter).
 
@@ -48,6 +49,22 @@ itself. Follow mode keeps the view pinned to the newest line; any scroll
 up turns follow off, returning to the bottom re-enables it. Clicking a
 line pins it (`off = len - 1 - abs(y)`), like k9s.
 
+### Files
+
+`f` on a container (or volume) row opens a filesystem explorer for it.
+The title shows the target, the first line the current path plus status
+(`…` while loading, the error in red, else `N items`). Directories render
+cyan with a `/` suffix and a `▸` caret, files show their size
+(`13B`, `1.1M`). `j/k/g/G` navigate, Enter/`l` (or a second click on the
+selected row) enters a directory, `←`/`h`/Backspace goes to the parent,
+`r` reloads, `/` filters by name, Esc returns to the tree.
+
+Container listings come from the docker archive API (works on stopped
+containers too). Volume listings are read through a throwaway
+never-started `busybox:latest` container that bind-mounts the volume at
+`/mnt/dockui` and is always removed afterwards — if `busybox` is not
+pulled the error line says so.
+
 ## Popups
 
 All popups are centered boxes rendered last; their rect + inner list rect
@@ -84,9 +101,10 @@ it can be fixed).
 ## Mouse
 
 - Wheel scrolls the popup list if one is open, else the focused area of
-  the active view (tree rows, detail, stats rows, logs/events lines).
+  the active view (tree rows, detail, stats rows, logs/events lines,
+  files rows).
 - Click selects: tree rows (second click on the selected row acts as
   Enter), stats table rows, popup entries (including edit-form fields and
-  APPLY), context list.
+  APPLY), context list, files rows (second click on a directory opens it).
 - Click in the detail pane moves focus there; clicking outside a popup
   closes it; clicking a log/event line pins the view to it.

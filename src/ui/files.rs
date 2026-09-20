@@ -14,7 +14,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     };
     app.areas.files = area;
 
-    let title = format!(" FILES: {} ", crate::util::truncate(&fs.root.label(), 40));
+    let title = format!(" FILES: {} ", crate::util::truncate(&fs.name, 40));
     let block = Block::bordered()
         .title(Span::styled(
             title,

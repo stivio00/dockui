@@ -410,93 +410,40 @@ pub fn spawn_logs(
         .collect()
 }
 
-/// List one directory of the filesystem explorer. Volumes are read through
-/// a throwaway container that is created (never started) with the volume
-/// bind-mounted, then removed again.
+/// List one directory of a container's filesystem via the docker archive
+/// API (works on stopped containers too).
 pub fn spawn_files_list(
     docker: Docker,
     tx: Sender<Msg>,
     req: u64,
-    root: crate::files::FilesRoot,
+    id: String,
     path: String,
 ) -> JoinHandle<()> {
-    use bollard::container::{
-        Config, CreateContainerOptions, DownloadFromContainerOptions, RemoveContainerOptions,
-    };
+    use bollard::container::DownloadFromContainerOptions;
 
-    async fn read_dir(
-        docker: &Docker,
-        id: &str,
-        real_path: &str,
-    ) -> Result<Vec<crate::files::FsEntry>, String> {
+    tokio::spawn(async move {
         use futures_util::StreamExt;
         let stream = docker.download_from_container(
-            id,
+            &id,
             Some(DownloadFromContainerOptions::<String> {
-                path: real_path.to_string(),
+                path: path.to_string(),
             }),
         );
         let mut data: Vec<u8> = Vec::new();
         let mut stream = std::pin::pin!(stream);
+        let mut result = Ok(Vec::new());
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|e| e.to_string())?;
-            data.extend_from_slice(&chunk);
-        }
-        crate::files::parse_tar_listing(&data)
-    }
-
-    tokio::spawn(async move {
-        let result = match &root {
-            crate::files::FilesRoot::Container { id, .. } => read_dir(&docker, id, &path).await,
-            crate::files::FilesRoot::Volume { name } => {
-                let tmp = format!(
-                    "dockui-volbrowse-{:x}",
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.subsec_nanos() as u64)
-                        .unwrap_or(0)
-                );
-                let config = Config::<String> {
-                    image: Some("busybox:latest".into()),
-                    cmd: Some(vec!["true".into()]),
-                    host_config: Some(bollard::models::HostConfig {
-                        binds: Some(vec![format!("{name}:/mnt/dockui")]),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                };
-                let created = docker
-                    .create_container(
-                        Some(CreateContainerOptions::<String> {
-                            name: tmp.clone(),
-                            platform: None,
-                        }),
-                        config,
-                    )
-                    .await;
-                match created {
-                    Ok(c) => {
-                        let real = format!("/mnt/dockui{}", path.trim_end_matches('/'));
-                        let r = read_dir(&docker, &c.id, &real).await;
-                        let _ = docker
-                            .remove_container(
-                                &c.id,
-                                Some(RemoveContainerOptions {
-                                    v: false,
-                                    force: true,
-                                    link: false,
-                                }),
-                            )
-                            .await;
-                        r
-                    }
-                    Err(e) => Err(format!(
-                        "volume browser needs the busybox:latest image \
-                         (docker pull busybox): {e}"
-                    )),
+            match chunk {
+                Ok(bytes) => data.extend_from_slice(&bytes),
+                Err(e) => {
+                    result = Err(e.to_string());
+                    break;
                 }
             }
-        };
+        }
+        if result.is_ok() {
+            result = crate::files::parse_tar_listing(&data);
+        }
         let _ = tx.send(Msg::FilesListed { req, result }).await;
     })
 }

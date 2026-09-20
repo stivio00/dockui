@@ -559,7 +559,7 @@ fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
         Line::from(vec![key("t"), desc("open terminal on running container")]),
         Line::from(vec![
             key("f"),
-            desc("browse files (container fs / volume) · follow (logs)"),
+            desc("browse container files · toggle follow (logs)"),
         ]),
         Line::from(vec![
             key("E"),

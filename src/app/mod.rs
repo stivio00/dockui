@@ -11,7 +11,7 @@ use tokio::sync::mpsc::Sender;
 use crate::actions::{EditForm, EnvEditor, PendingAction, TextInput};
 use crate::docker::{DockerContext, Tunnel};
 use crate::exec::TerminalRequest;
-use crate::files::{FilesRoot, FsEntry};
+use crate::files::FsEntry;
 use crate::model::*;
 use crate::ops::{self, Op};
 use crate::workers::{self, LogTarget, Msg, Workers};
@@ -105,10 +105,11 @@ pub struct Search {
     pub error: Option<String>,
 }
 
-/// Filesystem explorer state: what it is browsing, where it is, and what
-/// came back for the current directory request.
+/// Filesystem explorer state: which container it is browsing, where it
+/// is, and what came back for the current directory request.
 pub struct FilesState {
-    pub root: FilesRoot,
+    pub id: String,
+    pub name: String,
     pub path: String,
     pub entries: Vec<FsEntry>,
     pub sel: usize,
@@ -996,8 +997,7 @@ impl App {
 
     // ---- filesystem explorer ----
 
-    /// Open the explorer on whatever the selected tree row points at
-    /// (container or volume).
+    /// Open the explorer on the selected tree row if it is a container.
     pub fn open_files_for_row(&mut self) {
         let Some(row) = self.selected_row().cloned() else {
             return;
@@ -1008,23 +1008,18 @@ impl App {
                     .container_by_id(id)
                     .map(|c| c.name.clone())
                     .unwrap_or_else(|| id.chars().take(12).collect());
-                self.open_files(FilesRoot::Container {
-                    id: id.clone(),
-                    name,
-                });
+                self.open_files(id.clone(), name);
             }
-            RowKind::Volume(name) => {
-                self.open_files(FilesRoot::Volume { name: name.clone() });
-            }
-            _ => self.toast(false, "files: select a container or volume".into()),
+            _ => self.toast(false, "files: only containers can be browsed".into()),
         }
     }
 
-    fn open_files(&mut self, root: FilesRoot) {
+    fn open_files(&mut self, id: String, name: String) {
         self.leave_view_streams();
         self.view = View::Files;
         self.files = Some(FilesState {
-            root,
+            id,
+            name,
             path: "/".into(),
             entries: Vec::new(),
             sel: 0,
@@ -1067,9 +1062,9 @@ impl App {
         f.error = None;
         let req = f.req;
         let path = f.path.clone();
-        let root = f.root.clone();
+        let id = f.id.clone();
         if self.mock {
-            f.entries = crate::files::mock_listing(&path, matches!(root, FilesRoot::Volume { .. }));
+            f.entries = crate::files::mock_listing(&path);
             f.loading = false;
             f.sel = 0;
             return;
@@ -1079,7 +1074,7 @@ impl App {
             f.error = Some("not connected".into());
             return;
         };
-        let h = workers::spawn_files_list(docker, self.tx.clone(), req, root, path);
+        let h = workers::spawn_files_list(docker, self.tx.clone(), req, id, path);
         self.workers.add(h);
     }
 }

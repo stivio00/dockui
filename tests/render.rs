@@ -535,7 +535,7 @@ fn files_view_opens_navigates_and_returns() {
 }
 
 #[test]
-fn files_view_volume_browse() {
+fn files_view_volume_row_toast() {
     let mut app = test_app();
     let idx = app
         .tree_rows
@@ -544,21 +544,10 @@ fn files_view_volume_browse() {
         .unwrap();
     app.tree_sel = idx;
     press(&mut app, 'f');
-    assert_eq!(app.view, View::Files);
-    let lines = render(&mut app, 130, 42);
-    let text = joined(&lines);
-    assert!(text.contains("FILES: registry_data"));
-    assert!(text.contains("data/"));
-    assert!(text.contains("README.md"));
-
-    app.handle_key(key(KeyCode::Enter));
-    assert_eq!(app.files.as_ref().unwrap().path, "/data");
-    let lines = render(&mut app, 130, 42);
-    let text = joined(&lines);
-    assert!(text.contains("db.sqlite"));
-    assert!(text.contains("sessions/"));
-    app.handle_key(key(KeyCode::Esc));
     assert_eq!(app.view, View::Tree);
+    let lines = render(&mut app, 130, 42);
+    let text = joined(&lines);
+    assert!(text.contains("only containers can be browsed"));
 }
 
 #[test]

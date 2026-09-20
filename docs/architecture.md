@@ -44,9 +44,7 @@
   Worker sets are tracked in `JoinSet` groups so views can abort exactly
   the streams they own (`leave_view_streams`). Filesystem requests carry
   a monotonic `req` counter so a stale `FilesListed` can never overwrite
-  a newer listing. Volume listings create a throwaway never-started
-  busybox container bind-mounting the volume at `/mnt/dockui`, read its
-  tar, and always remove the container.
+  a newer listing.
 - **`ui/`** modules are pure functions of `App` + a `Rect`. As a side
   effect they record each region's rect into `App.areas`, which the
   mouse handlers read afterwards.

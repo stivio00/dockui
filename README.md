@@ -25,10 +25,9 @@ cargo run --release
   and CPU/memory sparklines for the selected container (1s cadence).
  - **Logs & events views**, follow mode, scroll, and pin-to-line by mouse
    click.
- - **Files explorer** (`f`): browse any container's filesystem (works on
-   stopped containers) and volume contents — navigate, filter by name,
-   mouse-friendly. Volume listings are read through a throwaway
-   never-started busybox container that is always removed afterwards.
+ - **Files explorer** (`f`): browse any container's filesystem — works on
+   stopped containers, filter by name, mouse-friendly. (Docker has no
+   content API for volumes, so browsing is container-only.)
  - **Actions**: `S/K/R/D` start/stop/restart/remove (delete asks for
   confirmation), `E` edit-and-recreate (name, image, command, env, ports,
   privileged, GPUs, network — env edits in a KEY/VALUE table), `t`
@@ -69,7 +68,7 @@ named pipes (Docker Desktop) are all supported.
 | `h` / Left / Esc        | Collapse / go up / clear filter / leave view      |
 | `1` `2` `3` `4`         | Tree / stats / events / logs view                 |
 | `L`                     | Logs for selection                                |
-| `f`                     | Browse files of the selected container / volume   |
+| `f`                     | Browse files of the selected container            |
 | `t`                     | Interactive shell on running container            |
 | `E`                     | Edit & recreate container (Env opens a table)     |
 | `<` / `>`                | Shrink / grow the tree pane (or drag divider)     |

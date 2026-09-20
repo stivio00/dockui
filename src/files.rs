@@ -8,24 +8,6 @@ pub struct FsEntry {
     pub size: u64,
 }
 
-/// What the explorer is browsing: a container's filesystem, or a named
-/// volume (read through a throwaway never-started container that bind
-/// mounts it at /mnt/dockui).
-#[derive(Clone, Debug, PartialEq)]
-pub enum FilesRoot {
-    Container { id: String, name: String },
-    Volume { name: String },
-}
-
-impl FilesRoot {
-    pub fn label(&self) -> String {
-        match self {
-            FilesRoot::Container { name, .. } => name.clone(),
-            FilesRoot::Volume { name } => name.clone(),
-        }
-    }
-}
-
 /// Parse the tar stream returned by the container archive API into the
 /// direct children of the requested directory. Docker prefixes entries
 /// with the archived directory's name (`etc/`, `etc/hostname`); when the
@@ -105,14 +87,14 @@ pub fn parse_tar_listing(data: &[u8]) -> Result<Vec<FsEntry>, String> {
 }
 
 /// Deterministic fake filesystem for `--mock` mode.
-pub fn mock_listing(path: &str, volume: bool) -> Vec<FsEntry> {
+pub fn mock_listing(path: &str) -> Vec<FsEntry> {
     let e = |name: &str, dir: bool, size: u64| FsEntry {
         name: name.into(),
         dir,
         size,
     };
-    match (volume, path) {
-        (false, "/") => vec![
+    match path {
+        "/" => vec![
             e("bin", true, 0),
             e("etc", true, 0),
             e("home", true, 0),
@@ -120,19 +102,16 @@ pub fn mock_listing(path: &str, volume: bool) -> Vec<FsEntry> {
             e("var", true, 0),
             e(".dockerenv", false, 0),
         ],
-        (false, "/bin") => vec![e("sh", false, 758_144), e("busybox", false, 1_138_112)],
-        (false, "/etc") => vec![
+        "/bin" => vec![e("sh", false, 758_144), e("busybox", false, 1_138_112)],
+        "/etc" => vec![
             e("hostname", false, 13),
             e("hosts", false, 174),
             e("resolv.conf", false, 92),
             e("ssl", true, 0),
         ],
-        (false, "/home") => vec![e("stephen", true, 0)],
-        (false, "/usr") => vec![e("bin", true, 0), e("lib", true, 0), e("share", true, 0)],
-        (false, "/var") => vec![e("log", true, 0), e("tmp", true, 0)],
-        (true, "/") => vec![e("data", true, 0), e("README.md", false, 128)],
-        (true, "/data") => vec![e("sessions", true, 0), e("db.sqlite", false, 4_194_304)],
-        (true, "/data/sessions") => vec![e("sess-a1b2", false, 512)],
+        "/home" => vec![e("stephen", true, 0)],
+        "/usr" => vec![e("bin", true, 0), e("lib", true, 0), e("share", true, 0)],
+        "/var" => vec![e("log", true, 0), e("tmp", true, 0)],
         _ => Vec::new(),
     }
 }

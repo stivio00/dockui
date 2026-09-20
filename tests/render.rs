@@ -589,3 +589,19 @@ fn files_view_mouse_selects_and_opens() {
     ));
     assert_eq!(app.files.as_ref().unwrap().path, "/home");
 }
+
+#[test]
+fn files_view_empty_listing_does_not_panic() {
+    let mut app = test_app();
+    let idx = app
+        .tree_rows
+        .iter()
+        .position(|r| matches!(&r.kind, RowKind::Container(id) if id.starts_with("a1b2")))
+        .unwrap();
+    app.tree_sel = idx;
+    press(&mut app, 'f');
+    app.files.as_mut().unwrap().entries.clear();
+    let lines = render(&mut app, 130, 42);
+    let text = joined(&lines);
+    assert!(text.contains("FILES: webshop-web-1"));
+}

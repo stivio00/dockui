@@ -78,7 +78,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
 
     let sel = fs.sel;
     if let Some(st) = app.files.as_mut() {
-        st.state.select((count > 0).then_some(sel.min(count - 1)));
+        st.state.select((count > 0).then(|| sel.min(count - 1)));
         f.render_stateful_widget(
             List::new(items)
                 .highlight_style(

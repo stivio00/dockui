@@ -1,0 +1,62 @@
+# dui ops — one-click container operations, selected with [o] in the TUI.
+# Copy to ~/.dui/ops.yml and edit to taste.
+#
+# Fields:
+#   image       (required) image to run
+#   name        container name; ${VAR}, $USER and $HOME are expanded
+#   description shown in the ops popup
+#   privileged  --privileged
+#   gpus        all | <count> | "GPU-UUID,GPU-UUID"  (--gpus)
+#   network/pid/ipc  host-namespace sharing (--net/--pid/--ipc)
+#   user        --user
+#   workdir     --workdir
+#   entrypoint  string or list (--entrypoint)
+#   command     string (shell-style, quotes respected) or list
+#   env         list of KEY=VALUE (${VAR} expanded)
+#   volumes     list of bind specs (-v)
+#   ports       list of [ip:]host:container[/proto] (-p)
+#   labels      map of labels
+#   restart     no | always | unless-stopped | on-failure | on-failure:N
+#   shm_size    bytes or "512m" style
+#   tty         allocate a tty
+#   attach      run like `docker run -it` — the terminal is handed to the
+#               container until it exits (implies tty + stdin)
+#   rm          remove on exit (--rm)
+#   replace     remove an existing container of the same name first (default true)
+#   pull        missing | always | never
+#   follow_logs open the logs view after starting
+
+top:
+  description: privileged system monitor with all GPUs
+  image: ubuntu:24.04
+  name: ${USER}_top
+  privileged: true
+  gpus: all
+  network: host
+  pid: host
+  ipc: host
+  volumes:
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+  command: top
+
+nvidia-smi:
+  description: one-shot GPU inventory
+  image: nvidia/cuda:12.4.1-base-ubuntu24.04
+  name: ${USER}_nvidia-smi
+  gpus: all
+  rm: true
+
+shell:
+  description: interactive toolbox shell (attached)
+  image: alpine:3.20
+  name: ${USER}_shell
+  attach: true
+  command: sh -c "apk add --no-cache curl jq; exec sh"
+
+web:
+  description: throwaway nginx on a custom port
+  image: nginx:1.27
+  name: ${USER}_web
+  ports:
+    - "8080:80"

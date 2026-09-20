@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, List, ListItem, Paragraph};
 
 use super::theme;
-use crate::actions::FormValue;
+use crate::actions::{FormValue, TextInput};
 use crate::app::{App, Popup};
 use crate::docker::EndpointKind;
 
@@ -47,10 +47,103 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         Popup::Help => draw_help(f, app, area),
         Popup::Ops => draw_ops(f, app, area),
         Popup::Confirm => draw_confirm(f, app, area),
-        Popup::Edit => draw_edit(f, app, area),
+        Popup::Edit => {
+            draw_edit(f, app, area);
+            draw_env_editor(f, app, area);
+        }
         Popup::Exec => draw_exec(f, app, area),
         Popup::None => {}
     }
+}
+
+fn cell_span(input: &TextInput, width: usize) -> Span<'static> {
+    let v = &input.value;
+    let cur = input.cursor.min(v.len());
+    let shown = format!("{}▏{}", &v[..cur], &v[cur..]);
+    Span::styled(
+        crate::util::truncate(&shown, width),
+        Style::new().fg(Color::White),
+    )
+}
+
+fn plain_span(input: &TextInput, width: usize) -> Span<'static> {
+    Span::styled(
+        crate::util::truncate(&input.value, width),
+        Style::new().fg(Color::Gray),
+    )
+}
+
+/// Env KEY/VALUE table layered over the recreate form.
+fn draw_env_editor(f: &mut Frame, app: &mut App, area: Rect) {
+    let Some(ed) = &app.env_editor else {
+        return;
+    };
+    let rows = (ed.rows.len() as u16 + 4)
+        .min(area.height.saturating_sub(2))
+        .max(5);
+    let popup = centered_rows(area, 72, rows);
+    app.areas.popup = popup;
+    let list = Rect {
+        x: popup.x + 1,
+        y: popup.y + 3,
+        width: popup.width.saturating_sub(2),
+        height: popup.height.saturating_sub(4),
+    };
+    app.areas.popup_list = list;
+    f.render_widget(Clear, popup);
+
+    let key_w = ((popup.width as usize).saturating_sub(8)) * 2 / 5;
+    app.areas.env_split_x = list.x + key_w as u16 + 2;
+
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled(
+                "KEY",
+                Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" ".repeat(key_w.saturating_sub(3))),
+            Span::styled(
+                "VALUE",
+                Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(Span::styled(
+            "enter/tab edit cell · a add · d del · esc apply",
+            Style::new().fg(Color::DarkGray),
+        )),
+    ];
+
+    let visible = list.height as usize;
+    let skip = ed.sel.saturating_sub(visible.saturating_sub(1));
+    for (i, r) in ed.rows.iter().enumerate().skip(skip).take(visible) {
+        let selected = i == ed.sel;
+        let editing_key = selected && ed.editing == Some(crate::actions::EnvCol::Key);
+        let editing_value = selected && ed.editing == Some(crate::actions::EnvCol::Value);
+        let key = if editing_key {
+            cell_span(&r.key, key_w)
+        } else {
+            plain_span(&r.key, key_w)
+        };
+        let value = if editing_value {
+            cell_span(&r.value, (popup.width as usize).saturating_sub(key_w + 10))
+        } else {
+            plain_span(&r.value, (popup.width as usize).saturating_sub(key_w + 10))
+        };
+        lines.push(Line::from(vec![
+            Span::styled(
+                if selected { "▶ " } else { "  " },
+                Style::new().fg(Color::Cyan),
+            ),
+            key,
+            Span::styled(" = ", Style::new().fg(Color::DarkGray)),
+            value,
+        ]));
+    }
+
+    f.render_widget(
+        Paragraph::new(lines).block(popup_block(" EDIT ENV │ esc apply & close ")),
+        popup,
+    );
 }
 
 fn popup_block(title: &str) -> Block<'static> {
@@ -307,7 +400,7 @@ fn draw_edit(f: &mut Frame, app: &mut App, area: Rect) {
         Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(Span::styled(
-        "type to edit · ↑/↓/tab switch · space toggle · enter next",
+        "type to edit · tab switch · space toggle · enter on Env opens table",
         Style::new().fg(Color::DarkGray),
     )));
 
@@ -466,7 +559,11 @@ fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
         Line::from(vec![key("t"), desc("open terminal on running container")]),
         Line::from(vec![
             key("E"),
-            desc("edit + recreate container (name/image/ports/env/gpus)"),
+            desc("edit + recreate container (env edits as table)"),
+        ]),
+        Line::from(vec![
+            key("< / >"),
+            desc("resize panes (or drag the divider)"),
         ]),
         Line::from(vec![
             key("S/K/R/D"),

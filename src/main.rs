@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use ratatui::crossterm::event::{DisableMouseCapture, EnableMouseCapture, Event as CEvent};
 use ratatui::crossterm::execute;
+use ratatui::crossterm::terminal::{Clear, ClearType};
 use tokio::sync::mpsc;
 
 use dockui::app::App;
@@ -56,7 +57,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let terminal = ratatui::init();
-    execute!(std::io::stdout(), EnableMouseCapture)?;
+    // some terminals keep alt-screen content between visits — start blank
+    execute!(std::io::stdout(), Clear(ClearType::All), EnableMouseCapture)?;
     let result = run(terminal, &mut rt, mock, exit_after).await;
     execute!(std::io::stdout(), DisableMouseCapture)?;
     ratatui::restore();
@@ -98,7 +100,12 @@ async fn exec_session(
     };
 
     enable_raw_mode()?;
-    execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(
+        std::io::stdout(),
+        EnterAlternateScreen,
+        Clear(ClearType::All),
+        EnableMouseCapture
+    )?;
     // Terminal::clear() queries the cursor position over stdin, which races
     // with the app's input thread (and hangs without a terminal emulator on
     // the other end); a fresh Terminal forces the same full repaint safely.

@@ -54,6 +54,81 @@ impl PendingAction {
 
 pub const GPU_OPTIONS: [&str; 5] = ["none", "all", "1", "2", "3"];
 
+/// One KEY=VALUE row of the env table editor.
+#[derive(Clone, Debug, Default)]
+pub struct EnvRow {
+    pub key: TextInput,
+    pub value: TextInput,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EnvCol {
+    Key,
+    Value,
+}
+
+/// Table editor layered over the recreate form when the Env field is
+/// activated. `editing: None` means row navigation; `Some(col)` puts typed
+/// characters into that cell of the selected row.
+#[derive(Clone, Debug)]
+pub struct EnvEditor {
+    pub rows: Vec<EnvRow>,
+    pub sel: usize,
+    pub editing: Option<EnvCol>,
+}
+
+impl EnvEditor {
+    pub fn from_text(s: &str) -> Self {
+        let mut rows: Vec<EnvRow> = split_list(s)
+            .into_iter()
+            .map(|entry| {
+                let (k, v) = entry.split_once('=').unwrap_or((entry.as_str(), ""));
+                EnvRow {
+                    key: TextInput::new(k),
+                    value: TextInput::new(v),
+                }
+            })
+            .collect();
+        if rows.is_empty() {
+            rows.push(EnvRow::default());
+        }
+        EnvEditor {
+            rows,
+            sel: 0,
+            editing: None,
+        }
+    }
+
+    /// Serialize back into the form's env text. Rows with an empty key are
+    /// dropped; values may contain `=` but not `;` (list separator).
+    pub fn to_text(&self) -> String {
+        self.rows
+            .iter()
+            .filter(|r| !r.key.value.trim().is_empty())
+            .map(|r| format!("{}={}", r.key.value.trim(), r.value.value))
+            .collect::<Vec<_>>()
+            .join("; ")
+    }
+
+    pub fn add_row(&mut self) {
+        let at = (self.sel + 1).min(self.rows.len());
+        self.rows.insert(at, EnvRow::default());
+        self.sel = at;
+        self.editing = Some(EnvCol::Key);
+    }
+
+    pub fn delete_row(&mut self) {
+        if self.rows.len() <= 1 {
+            self.rows[0] = EnvRow::default();
+            self.editing = None;
+            return;
+        }
+        self.rows.remove(self.sel);
+        self.sel = self.sel.min(self.rows.len() - 1);
+        self.editing = None;
+    }
+}
+
 /// A single-line text input with a cursor.
 #[derive(Clone, Debug, Default)]
 pub struct TextInput {

@@ -37,8 +37,16 @@ renders ANSI even without a pty.
   several types exist under both `bollard::models` and other modules.
 - ratatui 0.30: `ratatui::init()` enables raw mode + alt screen but NOT
   mouse capture — dockui enables/disables it manually in `src/main.rs`.
+- NEVER call `Terminal::clear()` (ratatui): it reads the cursor position
+  over stdin (`\x1b[6n`), which races with the app's input thread and hangs
+  without a terminal emulator. To force a full repaint, recreate the
+  `Terminal` and send `Clear(ClearType::All)` after `EnterAlternateScreen`
+  (see `exec_session` in `src/main.rs`).
 - State that must survive redraws lives on `App` (src/app.rs), never in
   widgets. `App.areas` is written during draw and read by mouse handlers.
+  Popup-layer state that rides on another popup (e.g. `env_editor` over
+  `Popup::Edit`) and layout state (`split_pct`, `dragging_split`) also
+  live on `App`.
 
 ## Structure
 

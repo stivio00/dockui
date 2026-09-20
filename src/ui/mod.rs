@@ -180,8 +180,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // body
     match app.view {
         View::Tree => {
-            let body = Layout::horizontal([Constraint::Percentage(58), Constraint::Percentage(42)])
-                .split(chunks[1]);
+            let body = Layout::horizontal([
+                Constraint::Percentage(app.split_pct),
+                Constraint::Percentage(100 - app.split_pct),
+            ])
+            .split(chunks[1]);
             tree::draw(f, app, body[0]);
             app.areas.detail = body[1];
             let lines = detail::build_detail_lines(app);

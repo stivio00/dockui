@@ -1,7 +1,9 @@
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 
 use dockui::app::{App, Popup, RowKind, View};
 use dockui::mock;
@@ -61,6 +63,15 @@ fn key(code: KeyCode) -> KeyEvent {
 
 fn press(app: &mut App, c: char) {
     app.handle_key(key(KeyCode::Char(c)));
+}
+
+fn mouse(kind: MouseEventKind, col: u16, row: u16) -> MouseEvent {
+    MouseEvent {
+        kind,
+        column: col,
+        row,
+        modifiers: KeyModifiers::NONE,
+    }
 }
 
 #[test]
@@ -370,4 +381,118 @@ fn volume_detail_renders() {
     assert!(text.contains("Driver"));
     assert!(text.contains("7.0GiB"));
     assert!(text.contains("RefCount"));
+}
+
+#[test]
+fn env_editor_opens_adds_and_commits() {
+    let mut app = test_app();
+    let idx = app
+        .tree_rows
+        .iter()
+        .position(|r| matches!(&r.kind, RowKind::Container(id) if id.starts_with("a1b2")))
+        .unwrap();
+    app.tree_sel = idx;
+    press(&mut app, 'E');
+    assert_eq!(app.popup, Popup::Edit);
+    // Name -> Image -> Command -> Env
+    for _ in 0..3 {
+        app.handle_key(key(KeyCode::Down));
+    }
+    app.handle_key(key(KeyCode::Enter));
+    assert!(app.env_editor.is_some(), "enter on Env opens the table");
+
+    let lines = render(&mut app, 130, 42);
+    let text = joined(&lines);
+    assert!(text.contains("EDIT ENV"), "editor popup missing\n{text}");
+    assert!(text.contains("NGINX_VERSION"));
+    assert!(text.contains("1.27.0"));
+
+    // add a row, type key, tab to value, type value, leave cell, close
+    press(&mut app, 'a');
+    for c in "FOO".chars() {
+        press(&mut app, c);
+    }
+    app.handle_key(key(KeyCode::Tab));
+    for c in "bar".chars() {
+        press(&mut app, c);
+    }
+    app.handle_key(key(KeyCode::Esc)); // leave cell
+    app.handle_key(key(KeyCode::Esc)); // close editor
+    assert!(app.env_editor.is_none());
+    let env = app.edit.as_ref().unwrap().text("Env").to_string();
+    assert!(env.contains("FOO=bar"), "new row missing in {env}");
+    assert!(
+        env.contains("NGINX_VERSION=1.27.0"),
+        "old rows lost in {env}"
+    );
+    // editor stays over the form, which is still open
+    assert_eq!(app.popup, Popup::Edit);
+}
+
+#[test]
+fn env_editor_click_opens_and_edits_cell() {
+    let mut app = test_app();
+    let idx = app
+        .tree_rows
+        .iter()
+        .position(|r| matches!(&r.kind, RowKind::Container(id) if id.starts_with("a1b2")))
+        .unwrap();
+    app.tree_sel = idx;
+    press(&mut app, 'E');
+    let _ = render(&mut app, 130, 42);
+    // click the Env row of the form: header(1) + hint(1) + field index 3
+    let a = app.areas.popup_list;
+    let row = a.y + 2 + 3;
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), a.x + 4, row));
+    assert!(app.env_editor.is_some(), "click on Env row opens table");
+
+    render(&mut app, 130, 42);
+    let a = app.areas.popup_list;
+    // click the VALUE cell of the first row
+    app.handle_mouse(mouse(
+        MouseEventKind::Down(MouseButton::Left),
+        app.areas.env_split_x + 5,
+        a.y,
+    ));
+    assert_eq!(
+        app.env_editor.as_ref().unwrap().editing,
+        Some(dockui::actions::EnvCol::Value)
+    );
+}
+
+#[test]
+fn split_resize_keys_and_drag_move_divider() {
+    let mut app = test_app();
+    let lines = render(&mut app, 130, 42);
+    assert!(lines.iter().any(|l| l.contains("webshop-web-1")));
+    let default_w = app.areas.tree.width;
+
+    press(&mut app, '>');
+    let _ = render(&mut app, 130, 42);
+    let grown_w = app.areas.tree.width;
+    assert!(grown_w > default_w, "{grown_w} vs {default_w}");
+
+    press(&mut app, '<');
+    press(&mut app, '<');
+    let _ = render(&mut app, 130, 42);
+    let shrunk_w = app.areas.tree.width;
+    assert!(shrunk_w < default_w, "{shrunk_w} vs {default_w}");
+
+    // drag the divider: mousedown on it, drag left, release
+    let t = app.areas.tree;
+    let div = t.x + t.width;
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), div, t.y + 5));
+    app.handle_mouse(mouse(
+        MouseEventKind::Drag(MouseButton::Left),
+        t.x + 35,
+        t.y + 5,
+    ));
+    app.handle_mouse(mouse(
+        MouseEventKind::Up(MouseButton::Left),
+        t.x + 35,
+        t.y + 5,
+    ));
+    let _ = render(&mut app, 130, 42);
+    let dragged_w = app.areas.tree.width;
+    assert!(dragged_w < default_w, "drag did not shrink tree pane");
 }

@@ -27,8 +27,11 @@ cargo run --release
   click.
 - **Actions**: `S/K/R/D` start/stop/restart/remove (delete asks for
   confirmation), `E` edit-and-recreate (name, image, command, env, ports,
-  privileged, GPUs, network), `t` interactive shell (`docker exec -it`,
-  bash-or-sh, as configured user / root / custom).
+  privileged, GPUs, network — env edits in a KEY/VALUE table), `t`
+  interactive shell (`docker exec -it`, bash-or-sh, as configured user /
+  root / custom).
+- **Resizable panes**: `<` / `>` (or dragging the divider with the mouse)
+  resize the tree/detail split.
 - **Ops** (`o`): user-defined one-key container launches from
   `~/.dockui/ops.yml` — privileged/GPU/host-namespace configs, port and
   volume mappings, `attach: true` for `docker run -it` style ops.
@@ -63,7 +66,8 @@ named pipes (Docker Desktop) are all supported.
 | `1` `2` `3` `4`         | Tree / stats / events / logs view                 |
 | `L`                     | Logs for selection                                |
 | `t`                     | Interactive shell on running container            |
-| `E`                     | Edit & recreate container                         |
+| `E`                     | Edit & recreate container (Env opens a table)     |
+| `<` / `>`                | Shrink / grow the tree pane (or drag divider)     |
 | `S` `K` `R` `D`         | Start / stop / restart / remove container         |
 | `o`                     | Ops launcher (from `~/.dockui/ops.yml`)           |
 | `/`                     | Regex filter (Enter applies, Esc cancels)         |

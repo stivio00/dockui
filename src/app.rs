@@ -9,7 +9,7 @@ use ratatui::widgets::{ListState, TableState};
 use tokio::sync::Notify;
 use tokio::sync::mpsc::Sender;
 
-use crate::actions::{ContainerAction, EditForm, PendingAction, TextInput};
+use crate::actions::{ContainerAction, EditForm, EnvCol, EnvEditor, PendingAction, TextInput};
 use crate::docker::{DockerContext, Tunnel};
 use crate::exec::{ExecRequest, TerminalRequest};
 use crate::model::*;
@@ -111,6 +111,8 @@ pub struct Areas {
     pub events: Rect,
     pub popup: Rect,
     pub popup_list: Rect,
+    /// x where the env editor's VALUE column starts (set during draw)
+    pub env_split_x: u16,
 }
 
 fn contains(area: Rect, col: u16, row: u16) -> bool {
@@ -173,11 +175,15 @@ pub struct App {
     pub pending: Option<PendingAction>,
     pub edit: Option<EditForm>,
     edit_pending: Option<String>,
+    pub env_editor: Option<EnvEditor>,
     pub exec_tx: Option<tokio::sync::mpsc::UnboundedSender<TerminalRequest>>,
     pub exec_user_input: Option<TextInput>,
     pub toast: Option<Toast>,
     pub search: Search,
     pub areas: Areas,
+    /// tree/detail width split in percent (Tree view)
+    pub split_pct: u16,
+    dragging_split: bool,
 }
 
 const HIST_LEN: usize = 120;
@@ -254,11 +260,14 @@ impl App {
             pending: None,
             edit: None,
             edit_pending: None,
+            env_editor: None,
             exec_tx,
             exec_user_input: None,
             toast: None,
             search: Search::default(),
             areas: Areas::default(),
+            split_pct: 58,
+            dragging_split: false,
         };
         app.rebuild_tree();
         Ok(app)
@@ -294,6 +303,7 @@ impl App {
         self.pending = None;
         self.edit = None;
         self.edit_pending = None;
+        self.env_editor = None;
         self.exec_user_input = None;
         if let Ok(mut slot) = self.tunnel_slot.lock() {
             *slot = None;
@@ -1140,6 +1150,18 @@ impl App {
         }
     }
 
+    fn nudge_split(&mut self, delta: i16) {
+        self.split_pct = (self.split_pct as i16 + delta).clamp(20, 80) as u16;
+    }
+
+    fn set_split_from_col(&mut self, col: u16) {
+        let t = self.areas.tree;
+        let d = self.areas.detail;
+        let full = (t.width + d.width).max(1) as u32;
+        let rel = col.saturating_sub(t.x) as u32;
+        self.split_pct = ((rel * 100) / full).clamp(20, 80) as u16;
+    }
+
     fn handle_tree_key(&mut self, code: KeyCode) -> bool {
         if let Some(res) = self.handle_global_key(code) {
             return res;
@@ -1163,6 +1185,8 @@ impl App {
                         .min(u16::MAX as usize) as u16;
                 }
                 KeyCode::Char('L') => self.open_logs_for_row(),
+                KeyCode::Char('<') => self.nudge_split(-3),
+                KeyCode::Char('>') => self.nudge_split(3),
                 _ => {}
             }
             return true;
@@ -1197,6 +1221,8 @@ impl App {
             }
             KeyCode::Left | KeyCode::Char('h') => self.collapse_or_up(),
             KeyCode::Tab => self.focus = Focus::Detail,
+            KeyCode::Char('<') => self.nudge_split(-3),
+            KeyCode::Char('>') => self.nudge_split(3),
             KeyCode::Char('L') => self.open_logs_for_row(),
             KeyCode::Char('S') => self.container_action(ContainerAction::Start),
             KeyCode::Char('K') => self.container_action(ContainerAction::Stop),
@@ -1642,6 +1668,7 @@ impl App {
         self.popup = Popup::None;
         self.pending = None;
         self.edit = None;
+        self.env_editor = None;
         self.exec_user_input = None;
     }
 
@@ -1716,11 +1743,15 @@ impl App {
     }
 
     fn handle_edit_key(&mut self, code: KeyCode) -> bool {
+        if self.env_editor.is_some() {
+            return self.handle_env_key(code);
+        }
         let Some(form) = &mut self.edit else {
             self.close_popup();
             return true;
         };
         let n_fields = form.fields.len();
+        let selected_label = form.fields.get(form.sel).map(|f| f.label);
         let is_text = form
             .fields
             .get(form.sel)
@@ -1746,6 +1777,11 @@ impl App {
                     let req = form.to_request();
                     self.close_popup();
                     self.apply_action(PendingAction::Recreate(Box::new(req)));
+                    return true;
+                }
+                if selected_label == Some("Env") {
+                    let text = form.text("Env").to_string();
+                    self.env_editor = Some(EnvEditor::from_text(&text));
                     return true;
                 }
                 if is_text {
@@ -1809,6 +1845,87 @@ impl App {
         true
     }
 
+    /// Commit the env editor back into the form's Env field and close it.
+    fn close_env_editor(&mut self) {
+        let text = self.env_editor.take().map(|ed| ed.to_text());
+        if let Some(text) = text
+            && let Some(form) = &mut self.edit
+            && let Some(f) = form.fields.iter_mut().find(|f| f.label == "Env")
+        {
+            f.value = crate::actions::FormValue::Text(TextInput::new(text));
+        }
+    }
+
+    fn handle_env_key(&mut self, code: KeyCode) -> bool {
+        if code == KeyCode::Esc {
+            if self
+                .env_editor
+                .as_ref()
+                .is_some_and(|e| e.editing.is_some())
+            {
+                if let Some(e) = &mut self.env_editor {
+                    e.editing = None;
+                }
+            } else {
+                self.close_env_editor();
+            }
+            return true;
+        }
+        let Some(ed) = &mut self.env_editor else {
+            return true;
+        };
+        if let Some(col) = ed.editing {
+            let cell = match col {
+                EnvCol::Key => &mut ed.rows[ed.sel].key,
+                EnvCol::Value => &mut ed.rows[ed.sel].value,
+            };
+            match code {
+                KeyCode::Enter | KeyCode::Tab => {
+                    ed.editing = match col {
+                        EnvCol::Key => Some(EnvCol::Value),
+                        EnvCol::Value => None,
+                    };
+                }
+                KeyCode::Up => {
+                    ed.editing = None;
+                    ed.sel = ed.sel.saturating_sub(1);
+                }
+                KeyCode::Down => {
+                    ed.editing = None;
+                    if ed.sel + 1 < ed.rows.len() {
+                        ed.sel += 1;
+                    }
+                }
+                KeyCode::Backspace => cell.backspace(),
+                KeyCode::Delete => cell.delete(),
+                KeyCode::Left => cell.left(),
+                KeyCode::Right => cell.right(),
+                KeyCode::Home => cell.home(),
+                KeyCode::End => cell.end(),
+                KeyCode::Char(c) => cell.insert(c),
+                _ => {}
+            }
+            return true;
+        }
+        let len = ed.rows.len();
+        match code {
+            KeyCode::Up | KeyCode::Char('k') => ed.sel = ed.sel.saturating_sub(1),
+            KeyCode::Down | KeyCode::Char('j') => {
+                if len > 1 {
+                    ed.sel = (ed.sel + 1).min(len - 1);
+                }
+            }
+            KeyCode::Char('g') | KeyCode::Home => ed.sel = 0,
+            KeyCode::Char('G') | KeyCode::End => ed.sel = len.saturating_sub(1),
+            KeyCode::Enter => ed.editing = Some(EnvCol::Key),
+            KeyCode::Tab => ed.editing = Some(EnvCol::Value),
+            KeyCode::Char('a') => ed.add_row(),
+            KeyCode::Char('d') | KeyCode::Delete => ed.delete_row(),
+            _ => {}
+        }
+        true
+    }
+
     fn activate_popup(&mut self) {
         match self.popup {
             Popup::Context => {
@@ -1866,12 +1983,25 @@ impl App {
             MouseEventKind::ScrollDown => self.mouse_scroll(ev.column, ev.row, 1),
             MouseEventKind::Down(MouseButton::Left) => self.mouse_left(ev.column, ev.row, true),
             MouseEventKind::Drag(MouseButton::Left) => self.mouse_left(ev.column, ev.row, false),
+            MouseEventKind::Up(MouseButton::Left) => self.dragging_split = false,
             _ => {}
         }
     }
 
     fn mouse_scroll(&mut self, col: u16, row: u16, dir: i32) {
         if self.popup != Popup::None {
+            if self.popup == Popup::Edit && self.env_editor.is_some() {
+                if contains(self.areas.popup_list, col, row)
+                    && let Some(ed) = &mut self.env_editor
+                {
+                    let len = ed.rows.len();
+                    if len > 1 {
+                        ed.sel = (ed.sel as i32 + dir).clamp(0, len as i32 - 1) as usize;
+                        ed.editing = None;
+                    }
+                }
+                return;
+            }
             if contains(self.areas.popup_list, col, row) {
                 if self.popup == Popup::Edit {
                     if let Some(form) = &mut self.edit {
@@ -1951,8 +2081,16 @@ impl App {
 
     fn mouse_left(&mut self, col: u16, row: u16, is_down: bool) {
         if self.popup != Popup::None {
+            if self.popup == Popup::Edit && self.env_editor.is_some() {
+                if contains(self.areas.popup, col, row) {
+                    self.mouse_env_select(col, row);
+                } else if is_down {
+                    self.close_env_editor();
+                }
+                return;
+            }
             if contains(self.areas.popup, col, row) {
-                self.mouse_popup_select(col, row);
+                self.mouse_popup_select(col, row, is_down);
             } else if is_down {
                 self.close_popup();
             }
@@ -1960,7 +2098,18 @@ impl App {
         }
         match self.view {
             View::Tree => {
+                if self.dragging_split {
+                    self.set_split_from_col(col);
+                    return;
+                }
                 let a = self.areas.tree;
+                let div = a.x + a.width;
+                if is_down && col + 1 >= div && col <= div + 1 && row >= a.y && row < a.y + a.height
+                {
+                    self.dragging_split = true;
+                    self.set_split_from_col(col);
+                    return;
+                }
                 if contains(a, col, row) && row > a.y && row < a.y + a.height.saturating_sub(1) {
                     let offset = self.tree_state.offset();
                     let idx = offset + (row - a.y - 1) as usize;
@@ -2038,7 +2187,7 @@ impl App {
         }
     }
 
-    fn mouse_popup_select(&mut self, col: u16, row: u16) {
+    fn mouse_popup_select(&mut self, col: u16, row: u16, is_down: bool) {
         let a = self.areas.popup_list;
         if !contains(a, col, row) {
             return;
@@ -2046,12 +2195,19 @@ impl App {
         let offset = self.popup_state.offset();
         let idx = offset + (row - a.y) as usize;
         if self.popup == Popup::Edit {
-            if let Some(form) = &mut self.edit {
-                let p = (row - a.y) as usize;
-                let field = p.saturating_sub(2);
-                if field <= form.fields.len() {
-                    form.sel = field;
-                }
+            let Some(form) = &mut self.edit else {
+                return;
+            };
+            let p = (row - a.y) as usize;
+            let field = p.saturating_sub(2);
+            if field > form.fields.len() {
+                return;
+            }
+            let is_env = field < form.fields.len() && form.fields[field].label == "Env";
+            form.sel = field;
+            if is_env && is_down {
+                let text = form.text("Env").to_string();
+                self.env_editor = Some(EnvEditor::from_text(&text));
             }
             return;
         }
@@ -2064,6 +2220,27 @@ impl App {
         };
         if idx < len {
             self.popup_sel = idx;
+        }
+    }
+
+    /// Click inside the env editor table: select the clicked row and start
+    /// editing the cell (key vs value) that was clicked.
+    fn mouse_env_select(&mut self, col: u16, row: u16) {
+        let a = self.areas.popup_list;
+        if !contains(a, col, row) {
+            return;
+        }
+        let idx = (row - a.y) as usize;
+        let cell = if col < self.areas.env_split_x {
+            EnvCol::Key
+        } else {
+            EnvCol::Value
+        };
+        if let Some(ed) = &mut self.env_editor
+            && idx < ed.rows.len()
+        {
+            ed.sel = idx;
+            ed.editing = Some(cell);
         }
     }
 }

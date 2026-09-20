@@ -20,6 +20,10 @@ search filter active the tree keeps matched rows, their ancestors, and the
 full subtrees of matched parents, and auto-expands everything so matches
 are visible; the selection snaps to the first matching container.
 
+The tree/detail split is `App.split_pct` (58% default, clamped 20–80):
+`<` / `>` nudge it in both focus modes, and dragging the divider between
+the panes with the mouse resizes it live (drag state: `App.dragging_split`).
+
 ### Detail pane
 
 Sections: identity (name, id, image, command), badges — `root`,
@@ -59,6 +63,12 @@ are recorded in `App.areas` for mouse support. Clicking outside closes.
   ↑/↓/Tab move, letters type into text fields, space/Enter cycles
   toggles/choices, Enter on APPLY recreates the container with all other
   host settings passed through unchanged.
+- **Env editor** — Enter (or a click) on the Edit form's Env field opens a
+  KEY/VALUE table over it. ↑/↓ or j/k pick a row, Enter/Tab start editing
+  the key (then the value), `a` appends a row, `d`/Delete removes it, and
+  Esc applies the table back into the Env field. Clicking a cell edits it
+  directly; clicking outside the table applies and closes it. Rows with an
+  empty key are dropped; values may contain `=` but not `;`.
 - **Exec** (`t`) — "as configured user" / "as root" / "custom user…" →
   mini text input; Enter launches the terminal handoff.
 

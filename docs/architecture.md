@@ -68,8 +68,10 @@
    straight to stdout; input comes from the *same* crossterm channel the
    TUI uses, re-encoded from `KeyEvent`s to terminal byte sequences —
    there is never a second reader on stdin.
-4. Re-enters the alternate screen, re-enables mouse capture, clears, and
-   resumes the TUI. Session errors surface as a toast, not a crash.
+4. Re-enters the alternate screen, sends `Clear(ClearType::All)`,
+   re-enables mouse capture, rebuilds the `Terminal` (fresh buffers force a
+   full repaint without querying the cursor over stdin), and resumes the
+   TUI. Session errors surface as a toast, not a crash.
 
 ## Threading & async model
 
